@@ -4,6 +4,7 @@ import com.aneonex.bitcoinchecker.datamodule.model.CheckerInfo
 import com.aneonex.bitcoinchecker.datamodule.model.CurrencyPairInfo
 import com.aneonex.bitcoinchecker.datamodule.model.Market
 import com.aneonex.bitcoinchecker.datamodule.model.Ticker
+import com.aneonex.bitcoinchecker.datamodule.util.forEachString
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.*
@@ -21,17 +22,15 @@ class Gemini : Market(NAME, TTS_NAME, null) {
     }
 
     override fun parseCurrencyPairs(requestId: Int, responseString: String, pairs: MutableList<CurrencyPairInfo>) {
-        val markets = JSONArray(responseString)
         val quoteCurrencyLength = 3
 
-        for(i in 0 until markets.length()){
-            val market = markets.getString(i)
-
-            pairs.add( CurrencyPairInfo(
-                    market.substring(0, market.length-quoteCurrencyLength).toUpperCase(Locale.ROOT),
-                    market.substring(market.length-quoteCurrencyLength).toUpperCase(Locale.ROOT),
+        JSONArray(responseString).forEachString { market ->
+            pairs.add(
+                CurrencyPairInfo(
+                    market.substring(0, market.length - quoteCurrencyLength).uppercase(Locale.ROOT),
+                    market.substring(market.length - quoteCurrencyLength).uppercase(Locale.ROOT),
                     market
-            ))
+                ))
         }
     }
 
@@ -48,7 +47,10 @@ class Gemini : Market(NAME, TTS_NAME, null) {
         ticker.last = jsonObject.getDouble("last")
         jsonObject.getJSONObject("volume").apply {
             ticker.vol = getDouble(checkerInfo.currencyBase)
-            ticker.timestamp = getLong("timestamp")
+
+            // The end of the 24-hour period over which volume was measured
+            // This is not the last price time
+            // ticker.timestamp = getLong("timestamp")
         }
     }
 }

@@ -15,7 +15,7 @@ class WazirX : Market(NAME, TTS_NAME, null) {
         private const val URL_CURRENCY_PAIRS = "https://api.wazirx.com/api/v2/market-status"
     }
 
-    override fun getCurrencyPairsUrl(requestId: Int): String? {
+    override fun getCurrencyPairsUrl(requestId: Int): String {
         return URL_CURRENCY_PAIRS
     }
 
@@ -30,9 +30,9 @@ class WazirX : Market(NAME, TTS_NAME, null) {
 
             pairs.add(
                 CurrencyPairInfo(
-                        baseCurrency.toUpperCase(Locale.ROOT),
-                        qouteCurrency.toUpperCase(Locale.ROOT),
-                        pairId
+                    baseCurrency.uppercase(Locale.ROOT),
+                    qouteCurrency.uppercase(Locale.ROOT),
+                    pairId
                 )
             )
         }

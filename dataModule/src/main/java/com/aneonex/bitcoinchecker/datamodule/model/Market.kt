@@ -6,12 +6,11 @@ import com.aneonex.bitcoinchecker.datamodule.util.TimeUtils
 import org.json.JSONObject
 
 abstract class Market(
-        @kotlin.jvm.JvmField val name: String,
-        @kotlin.jvm.JvmField val ttsName: String,
-        @kotlin.jvm.JvmField val currencyPairs: CurrencyPairsMap?
-    ) {
+    val name: String,
+    val ttsName: String,
+    val currencyPairs: CurrencyPairsMap? = null
+) {
 
-    @kotlin.jvm.JvmField
 	val key: String = this.javaClass.simpleName
 
     open val cautionResId: Int
@@ -35,7 +34,12 @@ abstract class Market(
     @Throws(Exception::class)
     fun parseTickerMain(requestId: Int, responseString: String, ticker: Ticker, checkerInfo: CheckerInfo): Ticker {
         parseTicker(requestId, responseString, ticker, checkerInfo)
-        if (ticker.timestamp <= 0) ticker.timestamp = System.currentTimeMillis() else ticker.timestamp = TimeUtils.parseTimeToMillis(ticker.timestamp)
+
+        if (ticker.timestamp <= 0)
+            ticker.timestamp = System.currentTimeMillis()
+        else
+            ticker.timestamp = TimeUtils.parseTimeToMillis(ticker.timestamp)
+
         return ticker
     }
 
@@ -63,7 +67,7 @@ abstract class Market(
     }
 
     @Throws(Exception::class)
-    protected open fun parseErrorFromJsonObject(requestId: Int, jsonObject: JSONObject, checkerInfo: CheckerInfo?): String? {
+    protected open fun parseErrorFromJsonObject(requestId: Int, jsonObject: JSONObject, checkerInfo: CheckerInfo): String? {
         throw Exception()
     }
 

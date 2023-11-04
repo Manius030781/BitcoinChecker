@@ -4,85 +4,33 @@ import com.aneonex.bitcoinchecker.datamodule.model.CheckerInfo
 import com.aneonex.bitcoinchecker.datamodule.model.CurrencyPairInfo
 import com.aneonex.bitcoinchecker.datamodule.model.Market
 import com.aneonex.bitcoinchecker.datamodule.model.Ticker
-import com.aneonex.bitcoinchecker.datamodule.model.currency.Currency
-import com.aneonex.bitcoinchecker.datamodule.model.currency.VirtualCurrency
-import com.aneonex.bitcoinchecker.datamodule.model.currency.CurrencyPairsMap
+import com.aneonex.bitcoinchecker.datamodule.util.forEachJSONArray
+import com.aneonex.bitcoinchecker.datamodule.util.forEachString
 import org.json.JSONArray
 import java.util.*
 
-class Bitfinex : Market(NAME, TTS_NAME, CURRENCY_PAIRS) {
+class Bitfinex : Market(NAME, TTS_NAME, null) {
     companion object {
         private const val NAME = "Bitfinex"
         private const val TTS_NAME = NAME
         private const val URL = "https://api-pub.bitfinex.com/v2/ticker/%1\$s"
-        private const val URL_CURRENCY_PAIRS = "https://api-pub.bitfinex.com/v2/tickers?symbols=ALL"
-        private val CURRENCY_PAIRS: CurrencyPairsMap = CurrencyPairsMap()
-
-        init {
-            CURRENCY_PAIRS[VirtualCurrency.BTC] = arrayOf(
-                    Currency.USD
-            )
-            CURRENCY_PAIRS[VirtualCurrency.DSH] = arrayOf(
-                    VirtualCurrency.BTC,
-                    Currency.USD
-            )
-            CURRENCY_PAIRS[VirtualCurrency.EOS] = arrayOf(
-                    VirtualCurrency.BTC,
-                    VirtualCurrency.ETH,
-                    Currency.USD
-            )
-            CURRENCY_PAIRS[VirtualCurrency.ETC] = arrayOf(
-                    VirtualCurrency.BTC,
-                    Currency.USD
-            )
-            CURRENCY_PAIRS[VirtualCurrency.ETH] = arrayOf(
-                    VirtualCurrency.BTC,
-                    Currency.USD
-            )
-            CURRENCY_PAIRS[VirtualCurrency.IOT] = arrayOf(
-                    VirtualCurrency.BTC,
-                    VirtualCurrency.ETH,
-                    Currency.USD
-            )
-            CURRENCY_PAIRS[VirtualCurrency.LTC] = arrayOf(
-                    VirtualCurrency.BTC,
-                    Currency.USD
-            )
-            CURRENCY_PAIRS[VirtualCurrency.OMG] = arrayOf(
-                    VirtualCurrency.BTC,
-                    VirtualCurrency.ETH,
-                    Currency.USD
-            )
-            CURRENCY_PAIRS[VirtualCurrency.RRT] = arrayOf(
-                    VirtualCurrency.BTC,
-                    Currency.USD
-            )
-            CURRENCY_PAIRS[VirtualCurrency.SAN] = arrayOf(
-                    VirtualCurrency.BTC,
-                    VirtualCurrency.ETH,
-                    Currency.USD
-            )
-            CURRENCY_PAIRS[VirtualCurrency.XMR] = arrayOf(
-                    VirtualCurrency.BTC,
-                    Currency.USD
-            )
-            CURRENCY_PAIRS[VirtualCurrency.XRP] = arrayOf(
-                    VirtualCurrency.BTC,
-                    Currency.USD
-            )
-            CURRENCY_PAIRS[VirtualCurrency.ZEC] = arrayOf(
-                    VirtualCurrency.BTC,
-                    Currency.USD
-            )
-        }
+        private const val URL_CURRENCY_SYMBOLS = "https://api-pub.bitfinex.com/v2/conf/pub:map:currency:sym"
+        private const val URL_CURRENCY_PAIRS = "https://api-pub.bitfinex.com/v2/conf/pub:list:pair:exchange"
     }
+
+    private val symbolsMap = mutableMapOf<String, String>()
+
+    override val currencyPairsNumOfRequests: Int
+        get() = 2 // 1) symbol map, 2) pairs
 
     override fun getUrl(requestId: Int, checkerInfo: CheckerInfo): String {
         var pairId = checkerInfo.currencyPairId
         if (pairId == null) {
-            pairId = String.format("t%1\$s%2\$s",
-                    checkerInfo.currencyBase.toUpperCase(Locale.ROOT),
-                    checkerInfo.currencyCounter.toUpperCase(Locale.ROOT))
+            pairId = String.format(
+                "t%1\$s%2\$s",
+                checkerInfo.currencyBase.uppercase(Locale.ROOT),
+                checkerInfo.currencyCounter.uppercase(Locale.ROOT)
+            )
         }
         return String.format(URL, pairId)
     }
@@ -104,39 +52,56 @@ class Bitfinex : Market(NAME, TTS_NAME, CURRENCY_PAIRS) {
     // ====================
     // Get currency pairs
     // ====================
-    override fun getCurrencyPairsUrl(requestId: Int): String? {
-        return URL_CURRENCY_PAIRS
-    }
+    override fun getCurrencyPairsUrl(requestId: Int): String =
+        if (requestId == 0) URL_CURRENCY_SYMBOLS else URL_CURRENCY_PAIRS
 
     override fun parseCurrencyPairs(requestId: Int, responseString: String, pairs: MutableList<CurrencyPairInfo>) {
-        val pairsArray = JSONArray(responseString)
-        for (i in 0 until pairsArray.length()) {
-            val pairArray = pairsArray.getJSONArray(i)
-            val pairId = pairArray.getString(0)
+        val dataArray = JSONArray(responseString)
 
-            if(pairId.isNullOrEmpty()) continue
-            if(!pairId.startsWith('t')) continue
+        // Get symbols map
+        if(requestId == 0) {
+            symbolsMap.clear()
 
-            var currencyBase: String
-            var currencyCounter: String
-
-            val splitPair = pairId.split(':')
-            if(splitPair.size == 2){
-                // pairId example "tLINK:USD"
-                currencyBase = splitPair[0].substring(1)
-                currencyCounter = splitPair[1]
+            if(dataArray.length() > 0){
+                dataArray.getJSONArray(0).also { currencyArray ->
+                    currencyArray.forEachJSONArray{ codeToSymbol ->
+                        symbolsMap[codeToSymbol.getString(0)] = codeToSymbol.getString(1)
+                    }
+                }
             }
-            else{
-                if(pairId.length != 7) continue
-                // pairId example "tBTCUSD"
-                currencyBase = pairId.substring(1, 4)
-                currencyCounter = pairId.substring(4)
+        }
+        // Get pairs
+        else {
+            fun getCurrencyDisplayName(currencyCode: String) = symbolsMap[currencyCode] ?: currencyCode
+
+            val pairsArray = dataArray.getJSONArray(0)
+            pairsArray.forEachString { pairId ->
+                val currencyBase: String
+                val currencyCounter: String
+
+                val splitPair = pairId.split(':')
+                if (splitPair.size == 2) {
+                    // pairId example "LINK:USD"
+                    currencyBase = getCurrencyDisplayName(splitPair[0])
+                    currencyCounter = getCurrencyDisplayName(splitPair[1])
+                } else {
+                    if (pairId.length != 6) return@forEachString
+                    // pairId example "BTCUSD"
+                    currencyBase = getCurrencyDisplayName(pairId.substring(0, 3))
+                    currencyCounter = getCurrencyDisplayName(pairId.substring(3))
+                }
+
+                pairs.add(
+                    CurrencyPairInfo(
+                        currencyBase,
+                        currencyCounter,
+                        "t$pairId"
+                    )
+                )
             }
 
-            pairs.add(CurrencyPairInfo(
-                    currencyBase,
-                    currencyCounter,
-                    pairId))
+            // Clear cache
+            symbolsMap.clear()
         }
     }
 }

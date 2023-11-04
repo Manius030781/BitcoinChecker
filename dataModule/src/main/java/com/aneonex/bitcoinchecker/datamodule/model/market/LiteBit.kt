@@ -2,9 +2,9 @@ package com.aneonex.bitcoinchecker.datamodule.model.market
 
 import com.aneonex.bitcoinchecker.datamodule.model.CheckerInfo
 import com.aneonex.bitcoinchecker.datamodule.model.CurrencyPairInfo
-import com.aneonex.bitcoinchecker.datamodule.model.SimpleMarket
 import com.aneonex.bitcoinchecker.datamodule.model.Ticker
 import com.aneonex.bitcoinchecker.datamodule.model.currency.Currency
+import com.aneonex.bitcoinchecker.datamodule.model.market.generic.SimpleMarket
 import org.json.JSONObject
 import java.util.*
 
@@ -20,11 +20,12 @@ class LiteBit : SimpleMarket(
         for (key in data.keys()) {
             val market = data.getJSONObject(key)
 
-            pairs.add(CurrencyPairInfo(
-                market.getString("abbr").toUpperCase(Locale.ROOT),
-                Currency.EUR,
-                key
-            ))
+            pairs.add(
+                CurrencyPairInfo(
+                    market.getString("abbr").uppercase(Locale.ROOT),
+                    Currency.EUR,
+                    key
+                ))
         }
     }
 

@@ -2,46 +2,51 @@ package com.aneonex.bitcoinchecker.datamodule.model.market
 
 import com.aneonex.bitcoinchecker.datamodule.model.CheckerInfo
 import com.aneonex.bitcoinchecker.datamodule.model.CurrencyPairInfo
-import com.aneonex.bitcoinchecker.datamodule.model.Market
 import com.aneonex.bitcoinchecker.datamodule.model.Ticker
+import com.aneonex.bitcoinchecker.datamodule.model.market.generic.SimpleMarket
+import com.aneonex.bitcoinchecker.datamodule.util.forEachJSONObject
+import org.json.JSONArray
 import org.json.JSONObject
 
-class Bittrex : Market(NAME, TTS_NAME, null) {
-    override fun getUrl(requestId: Int, checkerInfo: CheckerInfo): String {
-        return String.format(URL, checkerInfo.currencyCounter, checkerInfo.currencyBase) // reversed
+class Bittrex : SimpleMarket(
+    "Bittrex",
+    "https://api.bittrex.com/v3/markets",
+    "https://api.bittrex.com/v3/markets/%1\$s/ticker",
+    errorPropertyName = "code"
+) {
+    override fun parseCurrencyPairs(
+        requestId: Int,
+        responseString: String,
+        pairs: MutableList<CurrencyPairInfo>
+    ) {
+        JSONArray(responseString)
+            .forEachJSONObject {
+                if(it.getString("status") == "ONLINE") {
+                    pairs.add(
+                        CurrencyPairInfo(
+                            it.getString("baseCurrencySymbol"),
+                            it.getString("quoteCurrencySymbol"),
+                            it.getString("symbol")
+                        )
+                    )
+                }
+            }
     }
 
-    @Throws(Exception::class)
-    override fun parseTickerFromJsonObject(requestId: Int, jsonObject: JSONObject, ticker: Ticker, checkerInfo: CheckerInfo) {
-        val resultJsonObject = jsonObject.getJSONObject("result")
-        ticker.bid = resultJsonObject.getDouble("Bid")
-        ticker.ask = resultJsonObject.getDouble("Ask")
-        ticker.last = resultJsonObject.getDouble("Last")
+    override fun getPairId(checkerInfo: CheckerInfo): String {
+        return super.getPairId(checkerInfo) ?: with(checkerInfo){ "$currencyBase-$currencyCounter" }
     }
 
-    // ====================
-    // Get currency pairs
-    // ====================
-    override fun getCurrencyPairsUrl(requestId: Int): String? {
-        return URL_CURRENCY_PAIRS
-    }
-
-    @Throws(Exception::class)
-    override fun parseCurrencyPairsFromJsonObject(requestId: Int, jsonObject: JSONObject, pairs: MutableList<CurrencyPairInfo>) {
-        val resultJsonArray = jsonObject.getJSONArray("result")
-        for (i in 0 until resultJsonArray.length()) {
-            val marketJsonObject = resultJsonArray.getJSONObject(i)
-            pairs.add(CurrencyPairInfo(
-                    marketJsonObject.getString("MarketCurrency"),  // reversed
-                    marketJsonObject.getString("BaseCurrency"),  // reversed
-                    marketJsonObject.getString("MarketName")))
+    override fun parseTickerFromJsonObject(
+        requestId: Int,
+        jsonObject: JSONObject,
+        ticker: Ticker,
+        checkerInfo: CheckerInfo
+    ) {
+        jsonObject.also {
+            ticker.bid = it.getDouble("bidRate")
+            ticker.ask = it.getDouble("askRate")
+            ticker.last = it.getDouble("lastTradeRate")
         }
-    }
-
-    companion object {
-        private const val NAME = "Bittrex"
-        private const val TTS_NAME = NAME
-        private const val URL = "https://bittrex.com/api/v1.1/public/getticker?market=%1\$s-%2\$s"
-        private const val URL_CURRENCY_PAIRS = "https://bittrex.com/api/v1.1/public/getmarkets"
     }
 }

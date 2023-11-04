@@ -31,7 +31,7 @@ class BitcoinCoId : Market(NAME, TTS_NAME, null) {
     // ====================
     // Get currency pairs
     // ====================
-    override fun getCurrencyPairsUrl(requestId: Int): String? {
+    override fun getCurrencyPairsUrl(requestId: Int): String {
         return URL_CURRENCY_PAIRS
     }
 
@@ -43,8 +43,8 @@ class BitcoinCoId : Market(NAME, TTS_NAME, null) {
             val pairId = tickerNamesArray.getString(i) ?: continue
             val currencies = pairId.split("_".toRegex()).toTypedArray()
             if (currencies.size != 2) continue
-            val currencyBase = currencies[0].toUpperCase(Locale.ENGLISH)
-            val currencyCounter = currencies[1].toUpperCase(Locale.ENGLISH)
+            val currencyBase = currencies[0].uppercase(Locale.ENGLISH)
+            val currencyCounter = currencies[1].uppercase(Locale.ENGLISH)
             pairs.add(CurrencyPairInfo(currencyBase, currencyCounter, pairId))
         }
     }
